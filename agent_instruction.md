@@ -154,7 +154,7 @@ graph TD
    docker compose run --rm check
    docker compose run --rm migrate
    ```
-3. **`GUIDE.md`**: Step-by-step walkthrough explaining how to verify data, query PostgreSQL directly, and adapt `.env` for real client databases.
+3. **`guide.md`**: Step-by-step walkthrough explaining how to verify data, query PostgreSQL directly, and adapt `.env` for real client databases.
 
 ---
 

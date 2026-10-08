@@ -77,8 +77,8 @@ c:\Users\aks89\Desktop\mysql-to-postgres/
 │   └── validation_report.md     # 100% row reconciliation audit report
 │
 ├── requirements.txt             # Python dependencies
-├── AGENT_INSTRUCTIONS.md        # AI Coding Agent Prompts & Step-by-Step Build Instructions
-├── GUIDE.md                     # Step-by-step walkthrough guide
+├── agent_instruction.md        # AI Coding Agent Prompts & Step-by-Step Build Instructions
+├── guide.md                     # Step-by-step walkthrough guide
 └── README.md                    # Project overview & quickstart
 ```
 

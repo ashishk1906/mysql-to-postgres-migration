@@ -100,7 +100,7 @@ docker exec postgres_target psql -U postgres -d enterprisedb -c "INSERT INTO cor
 | :--- | :--- |
 | [`.env.example`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/.env.example) | Template file with all required environment variable keys (committed to git) |
 | [`.env`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/.env) | Local environment configuration storing database credentials (gitignored) |
-| [`AGENT_INSTRUCTIONS.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/AGENT_INSTRUCTIONS.md) | Reproducible AI Coding Agent prompt & 6-phase autonomous build instructions |
+| [`agent_instruction.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/agent_instruction.md) | Reproducible AI Coding Agent prompt & 6-phase autonomous build instructions |
 | [`docker-compose.yml`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/docker-compose.yml) | Docker Compose configuration defining databases, auto-seeder, checker, and migrator |
 | [`docs/CANONICAL_DATA_MODEL.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/docs/CANONICAL_DATA_MODEL.md) | Business entity definitions and domain dictionary matching your proposal guide |
 | [`docs/MAPPING_DOCUMENT.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/docs/MAPPING_DOCUMENT.md) | Exhaustive column mapping table across all 26 tables (`SQL Server column -> Canonical field -> PostgreSQL column`) |
