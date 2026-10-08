@@ -1,0 +1,89 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver_source
+    restart: always
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "StrongP@ssw0rd!2026"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'StrongP@ssw0rd!2026' -C -Q 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_target
+    restart: always
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres_password"
+      POSTGRES_DB: "enterprisedb"
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enterprisedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # Auto-seeds the complex sample database on startup
+  seed:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver_seeder
+    restart: "no"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./sql_server:/scripts
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P 'StrongP@ssw0rd!2026' -C -i /scripts/01_init_schema.sql
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P 'StrongP@ssw0rd!2026' -C -i /scripts/02_seed_data.sql
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P 'StrongP@ssw0rd!2026' -C -i /scripts/03_views_procedures.sql
+        echo "Source SQL Server database seeded successfully."
+
+  # Runs the database inspector inside Docker
+  check:
+    build: .
+    container_name: db_checker
+    command: ["python", "check_databases.py"]
+    environment:
+      RUNNING_IN_DOCKER: "true"
+      MSSQL_HOST: "sqlserver"
+      MSSQL_PORT: "1433"
+      PG_HOST: "postgres"
+      PG_PORT: "5432"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # Runs the migration script inside Docker
+  migrate:
+    build: .
+    container_name: migration_runner
+    command: ["python", "migrate.py"]
+    environment:
+      RUNNING_IN_DOCKER: "true"
+      MSSQL_HOST: "sqlserver"
+      MSSQL_PORT: "1433"
+      PG_HOST: "postgres"
+      PG_PORT: "5432"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./output:/app/output

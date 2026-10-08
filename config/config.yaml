@@ -1,0 +1,21 @@
+# Database Connection Settings
+# Update these when migrating your client's database
+
+source:
+  host: "localhost"
+  port: 1433
+  user: "sa"
+  password: "StrongP@ssw0rd!2026"
+  database: "EnterpriseSalesERP"
+  schemas:
+    - "core"
+    - "inventory"
+    - "sales"
+    - "audit"
+
+target:
+  host: "localhost"
+  port: 5434
+  user: "postgres"
+  password: "postgres_password"
+  database: "enterprisedb"

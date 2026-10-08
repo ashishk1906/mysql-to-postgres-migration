@@ -1,0 +1,12 @@
+# SQL Server to PostgreSQL Migration Framework
+# Dependencies
+pymssql>=2.2.8
+pyodbc>=5.0.0
+psycopg2-binary>=2.9.9
+SQLAlchemy>=2.0.0
+pyyaml>=6.0.1
+pydantic>=2.5.0
+rich>=13.7.0
+tabulate>=0.9.0
+tqdm>=4.66.0
+python-dotenv>=1.0.0
