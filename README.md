@@ -58,11 +58,10 @@ docker compose run --rm migrate
 c:\Users\aks89\Desktop\mysql-to-postgres/
 ├── docker-compose.yml           # Complete Docker setup (sqlserver, postgres, seed, check, migrate)
 ├── Dockerfile                   # Python container image for check and migrate runners
+├── .env.example                 # Template environment variables (committed to git, keys only)
+├── .env                         # Actual database credentials (gitignored, secure)
 ├── check_databases.py           # Database inspection script (used by 'docker compose run --rm check')
 ├── migrate.py                   # Self-contained migration script (used by 'docker compose run --rm migrate')
-│
-├── config/
-│   └── config.yaml              # Database connection settings (edit when client shares DB)
 │
 ├── sql_server/                  # Complex sample database (26 tables across 4 schemas)
 │   ├── 01_init_schema.sql       # Source DDL (keys, identities, checks, indexes)
@@ -128,12 +127,18 @@ OVERALL RESULT: SUCCESS (100% Match)
 
 ## 5. Adapting for the Real Client Database
 
+All database connection parameters and credentials are externalized to environment variables and loaded via `.env` (never hardcoded in code or committed to Git).
+
 When the client provides their database credentials:
-1. Open [`config/config.yaml`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/config/config.yaml).
-2. Enter the client's host, port, user, password, database, and schemas under `source:`.
-3. Enter your destination PostgreSQL connection under `target:`.
-4. Run:
+1. Copy `.env.example` to `.env` (if not already done):
+   ```bash
+   cp .env.example .env
+   ```
+2. Open `.env` and fill in the client's SQL Server and PostgreSQL connection details:
+   - `MSSQL_HOST`, `MSSQL_PORT`, `MSSQL_USER`, `MSSQL_PASSWORD`, `MSSQL_DB`, `MSSQL_SCHEMAS`
+   - `PG_HOST`, `PG_PORT`, `PG_USER`, `PG_PASSWORD`, `PG_DB`
+3. Run the migration:
    ```bash
    docker compose run --rm migrate
    ```
-*(Or if you prefer running via local Python, `python migrate.py` also works).*
+*(Or if running via local Python, `python migrate.py` also works).*

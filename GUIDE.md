@@ -98,9 +98,11 @@ docker exec postgres_target psql -U postgres -d enterprisedb -c "INSERT INTO cor
 
 | File | Description |
 | :--- | :--- |
+| [`.env.example`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/.env.example) | Template file with all required environment variable keys (committed to git) |
+| [`.env`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/.env) | Local environment configuration storing database credentials (gitignored) |
 | [`docker-compose.yml`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/docker-compose.yml) | Docker Compose configuration defining databases, auto-seeder, checker, and migrator |
 | [`docs/CANONICAL_DATA_MODEL.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/docs/CANONICAL_DATA_MODEL.md) | Business entity definitions and domain dictionary matching your proposal guide |
-| [`docs/MAPPING_DOCUMENT.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/docs/MAPPING_DOCUMENT.md) | Exhaustive column mapping table across all 26 tables (`SQL Server column ➔ Canonical field ➔ PostgreSQL column`) |
+| [`docs/MAPPING_DOCUMENT.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/docs/MAPPING_DOCUMENT.md) | Exhaustive column mapping table across all 26 tables (`SQL Server column -> Canonical field -> PostgreSQL column`) |
 | [`output/postgres_schema.sql`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/output/postgres_schema.sql) | Auto-generated target PostgreSQL DDL |
 | [`output/validation_report.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/output/validation_report.md) | Reconciliation audit report confirming 100% row matching |
 
@@ -108,10 +110,15 @@ docker exec postgres_target psql -U postgres -d enterprisedb -c "INSERT INTO cor
 
 ## 7. How to Migrate the Real Client Database
 
+All database connection parameters and credentials are externalized to `.env` (never hardcoded in code):
+
 When the client provides their database credentials:
-1. Open [`config/config.yaml`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/config/config.yaml).
-2. Enter the client's host, port, user, password, database, and schemas under `source:`.
-3. Enter your destination PostgreSQL connection details under `target:`.
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+2. Enter the client's host, port, user, password, database, and schemas under `MSSQL_*`.
+3. Enter your destination PostgreSQL connection details under `PG_*`.
 4. Run:
    ```bash
    docker compose run --rm migrate

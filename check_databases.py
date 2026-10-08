@@ -9,26 +9,35 @@ Quickly checks and displays:
 
 import os
 import sys
-import yaml
+from dotenv import load_dotenv
 from tabulate import tabulate
+
+load_dotenv()
 
 IS_DOCKER = os.environ.get("RUNNING_IN_DOCKER") == "true" or os.path.exists("/.dockerenv")
 
-def check_sql_server(cfg):
+def check_sql_server():
     print("\n" + "="*70)
     print(" 1. SOURCE DATABASE CHECK: SQL SERVER (EnterpriseSalesERP)")
     print("="*70)
     try:
         import pymssql
-        src = cfg.get("source", {})
-        server = os.environ.get("MSSQL_HOST", "sqlserver" if IS_DOCKER else src.get("host", "localhost"))
-        port = int(os.environ.get("MSSQL_PORT", src.get("port", 1433)))
+        server = os.environ.get("MSSQL_HOST", "sqlserver" if IS_DOCKER else "localhost")
+        port = int(os.environ.get("MSSQL_PORT", "1433"))
+        user = os.environ.get("MSSQL_USER", "")
+        password = os.environ.get("MSSQL_PASSWORD", "")
+        database = os.environ.get("MSSQL_DB", "")
+
+        if not user or not password or not database:
+            print("[-] MSSQL configuration missing in .env (MSSQL_USER, MSSQL_PASSWORD, MSSQL_DB).")
+            return
+
         conn = pymssql.connect(
             server=server,
             port=port,
-            user=src.get("user", "sa"),
-            password=src.get("password", "StrongP@ssw0rd!2026"),
-            database=src.get("database", "EnterpriseSalesERP"),
+            user=user,
+            password=password,
+            database=database,
             charset="UTF-8",
             as_dict=True
         )
@@ -66,21 +75,28 @@ def check_sql_server(cfg):
         print(f"[-] Could not connect to SQL Server: {e}")
         print("    Make sure docker container is running: docker compose -f docker/docker-compose.yml up -d")
 
-def check_postgres(cfg):
+def check_postgres():
     print("\n" + "="*70)
     print(" 2. TARGET DATABASE CHECK: POSTGRESQL (enterprisedb)")
     print("="*70)
     try:
         import psycopg2
-        tgt = cfg.get("target", {})
-        host = os.environ.get("PG_HOST", "postgres" if IS_DOCKER else tgt.get("host", "localhost"))
-        port = int(os.environ.get("PG_PORT", 5432 if IS_DOCKER else tgt.get("port", 5434)))
+        host = os.environ.get("PG_HOST", "postgres" if IS_DOCKER else "localhost")
+        port = int(os.environ.get("PG_PORT", 5432 if IS_DOCKER else 5434))
+        user = os.environ.get("PG_USER", "")
+        password = os.environ.get("PG_PASSWORD", "")
+        dbname = os.environ.get("PG_DB", "")
+
+        if not user or not password or not dbname:
+            print("[-] PostgreSQL configuration missing in .env (PG_USER, PG_PASSWORD, PG_DB).")
+            return
+
         conn = psycopg2.connect(
             host=host,
             port=port,
-            user=tgt.get("user", "postgres"),
-            password=tgt.get("password", "postgres_password"),
-            dbname=tgt.get("database", "enterprisedb")
+            user=user,
+            password=password,
+            dbname=dbname
         )
         cur = conn.cursor()
         
@@ -95,7 +111,7 @@ def check_postgres(cfg):
         
         if not tables:
             print("\n[-] Target PostgreSQL currently has 0 migrated tables.")
-            print("    Run 'python run_migration.py run-all' to deploy schema and migrate data.")
+            print("    Run 'docker compose run --rm migrate' to deploy schema and migrate data.")
             conn.close()
             return
             
@@ -139,11 +155,8 @@ def check_mysql():
         print(f"[-] MySQL check note: {e}")
 
 if __name__ == "__main__":
-    with open("config/config.yaml", "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-    
-    check_sql_server(cfg)
-    check_postgres(cfg)
+    check_sql_server()
+    check_postgres()
     check_mysql()
     print("\n" + "="*70)
     print(" CHECK COMPLETE")

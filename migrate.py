@@ -11,50 +11,61 @@ Steps:
   5. Validate row counts & verify
 """
 
+import os
+import re
+from dotenv import load_dotenv
 import pymssql
 import psycopg2
 from psycopg2.extras import execute_values
 from tabulate import tabulate
-import re
 
-import os
-import yaml
+# Load environment variables from .env file
+load_dotenv()
 
-# Load database configuration from config/config.yaml or Docker environment
+# Load database configuration from .env / environment variables
 def load_config():
-    cfg = {}
-    if os.path.exists("config/config.yaml"):
-        with open("config/config.yaml", "r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-
-    src = cfg.get("source", {})
-    tgt = cfg.get("target", {})
-    
     # Auto-detect if running inside Docker or on host machine
     is_docker = os.environ.get("RUNNING_IN_DOCKER") == "true" or os.path.exists("/.dockerenv")
 
-    ms_host = os.environ.get("MSSQL_HOST", "sqlserver" if is_docker else src.get("host", "localhost"))
-    ms_port = int(os.environ.get("MSSQL_PORT", src.get("port", 1433)))
+    ms_host = os.environ.get("MSSQL_HOST", "sqlserver" if is_docker else "localhost")
+    ms_port = int(os.environ.get("MSSQL_PORT", "1433"))
 
-    pg_host = os.environ.get("PG_HOST", "postgres" if is_docker else tgt.get("host", "localhost"))
-    pg_port = int(os.environ.get("PG_PORT", 5432 if is_docker else tgt.get("port", 5434)))
+    pg_host = os.environ.get("PG_HOST", "postgres" if is_docker else "localhost")
+    pg_port = int(os.environ.get("PG_PORT", "5432" if is_docker else "5434"))
 
     mssql_conf = {
         "server": ms_host,
         "port": ms_port,
-        "user": os.environ.get("MSSQL_USER", src.get("user", "sa")),
-        "password": os.environ.get("MSSQL_PASSWORD", src.get("password", "StrongP@ssw0rd!2026")),
-        "database": os.environ.get("MSSQL_DB", src.get("database", "EnterpriseSalesERP"))
+        "user": os.environ.get("MSSQL_USER", ""),
+        "password": os.environ.get("MSSQL_PASSWORD", ""),
+        "database": os.environ.get("MSSQL_DB", "")
     }
-    schemas = src.get("schemas", ["core", "inventory", "sales", "audit"])
+    
+    # Comma-separated schemas from .env
+    raw_schemas = os.environ.get("MSSQL_SCHEMAS", "")
+    schemas = [s.strip() for s in raw_schemas.split(",") if s.strip()]
     
     pg_conf = {
         "host": pg_host,
         "port": pg_port,
-        "user": os.environ.get("PG_USER", tgt.get("user", "postgres")),
-        "password": os.environ.get("PG_PASSWORD", tgt.get("password", "postgres_password")),
-        "dbname": os.environ.get("PG_DB", tgt.get("database", "enterprisedb"))
+        "user": os.environ.get("PG_USER", ""),
+        "password": os.environ.get("PG_PASSWORD", ""),
+        "dbname": os.environ.get("PG_DB", "")
     }
+
+    # Validate that all required configuration is provided in .env
+    missing = []
+    if not mssql_conf["user"]: missing.append("MSSQL_USER")
+    if not mssql_conf["password"]: missing.append("MSSQL_PASSWORD")
+    if not mssql_conf["database"]: missing.append("MSSQL_DB")
+    if not schemas: missing.append("MSSQL_SCHEMAS")
+    if not pg_conf["user"]: missing.append("PG_USER")
+    if not pg_conf["password"]: missing.append("PG_PASSWORD")
+    if not pg_conf["dbname"]: missing.append("PG_DB")
+
+    if missing:
+        raise ValueError(f"Missing required environment variables in .env: {', '.join(missing)}. Please check your .env file.")
+
     return mssql_conf, pg_conf, schemas
 
 MSSQL_CONF, PG_CONF, SCHEMAS = load_config()
