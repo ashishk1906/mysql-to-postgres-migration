@@ -333,3 +333,43 @@ CREATE TABLE IF NOT EXISTS "sales"."promotions" (
     CONSTRAINT "pk_promotions" PRIMARY KEY ("promotion_id")
 );
 
+-- Canonical Views
+CREATE OR REPLACE VIEW sales.vw_customer_order_summary AS
+        SELECT 
+            c.customer_id,
+            c.contact_name,
+            c.company_name,
+            c.customer_type,
+            COUNT(o.order_id) AS total_orders_placed,
+            COALESCE(SUM(o.total_amount), 0.00) AS lifetime_order_value,
+            MAX(o.order_date) AS most_recent_order_date,
+            AVG(o.total_amount) AS average_order_value
+        FROM core.customers c
+        LEFT JOIN sales.orders o ON c.customer_id = o.customer_id
+        GROUP BY 
+            c.customer_id,
+            c.contact_name,
+            c.company_name,
+            c.customer_type;
+
+CREATE OR REPLACE VIEW inventory.vw_low_stock_products AS
+        SELECT 
+            p.product_id,
+            p.sku,
+            p.product_name,
+            w.warehouse_code,
+            w.warehouse_name,
+            inv.quantity_on_hand,
+            inv.quantity_reserved,
+            inv.reorder_point,
+            (inv.quantity_on_hand - inv.quantity_reserved) AS available_stock,
+            CASE 
+                WHEN (inv.quantity_on_hand - inv.quantity_reserved) <= inv.reorder_point THEN 'REORDER_NOW'
+                WHEN (inv.quantity_on_hand - inv.quantity_reserved) <= (inv.reorder_point + inv.safety_stock) THEN 'LOW_WARNING'
+                ELSE 'SUFFICIENT'
+            END AS stock_status
+        FROM inventory.product_inventory inv
+        JOIN inventory.products p ON inv.product_id = p.product_id
+        JOIN inventory.warehouses w ON inv.warehouse_id = w.warehouse_id
+        WHERE (inv.quantity_on_hand - inv.quantity_reserved) <= (inv.reorder_point + inv.safety_stock);
+

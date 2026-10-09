@@ -278,6 +278,55 @@ def run_migration():
                 """
                 pg_cur.execute(sync_sql)
 
+    # Step 5: Deploy Canonical Views in PostgreSQL
+    print("\n[Step 5] Deploying Canonical Views in PostgreSQL...")
+    canonical_views = [
+        ("""
+        CREATE OR REPLACE VIEW sales.vw_customer_order_summary AS
+        SELECT 
+            c.customer_id,
+            c.contact_name,
+            c.company_name,
+            c.customer_type,
+            COUNT(o.order_id) AS total_orders_placed,
+            COALESCE(SUM(o.total_amount), 0.00) AS lifetime_order_value,
+            MAX(o.order_date) AS most_recent_order_date,
+            AVG(o.total_amount) AS average_order_value
+        FROM core.customers c
+        LEFT JOIN sales.orders o ON c.customer_id = o.customer_id
+        GROUP BY 
+            c.customer_id,
+            c.contact_name,
+            c.company_name,
+            c.customer_type;
+        """, "sales.vw_customer_order_summary"),
+        ("""
+        CREATE OR REPLACE VIEW inventory.vw_low_stock_products AS
+        SELECT 
+            p.product_id,
+            p.sku,
+            p.product_name,
+            w.warehouse_code,
+            w.warehouse_name,
+            inv.quantity_on_hand,
+            inv.quantity_reserved,
+            inv.reorder_point,
+            (inv.quantity_on_hand - inv.quantity_reserved) AS available_stock,
+            CASE 
+                WHEN (inv.quantity_on_hand - inv.quantity_reserved) <= inv.reorder_point THEN 'REORDER_NOW'
+                WHEN (inv.quantity_on_hand - inv.quantity_reserved) <= (inv.reorder_point + inv.safety_stock) THEN 'LOW_WARNING'
+                ELSE 'SUFFICIENT'
+            END AS stock_status
+        FROM inventory.product_inventory inv
+        JOIN inventory.products p ON inv.product_id = p.product_id
+        JOIN inventory.warehouses w ON inv.warehouse_id = w.warehouse_id
+        WHERE (inv.quantity_on_hand - inv.quantity_reserved) <= (inv.reorder_point + inv.safety_stock);
+        """, "inventory.vw_low_stock_products")
+    ]
+    for v_sql, v_name in canonical_views:
+        pg_cur.execute(v_sql)
+        print(f" -> Created view {v_name}")
+
     # Save generated DDL to output/postgres_schema.sql
     import os
     os.makedirs("output", exist_ok=True)
@@ -315,6 +364,10 @@ def run_migration():
                 pk_cols_str = ', '.join([f'"{c}"' for c in pk_map[tbl_key]])
                 col_defs.append(f'    CONSTRAINT "pk_{tgt_table}" PRIMARY KEY ({pk_cols_str})')
             f.write(f'CREATE TABLE IF NOT EXISTS "{tgt_schema}"."{tgt_table}" (\n' + ',\n'.join(col_defs) + '\n);\n\n')
+
+        f.write("-- Canonical Views\n")
+        for v_sql, _ in canonical_views:
+            f.write(v_sql.strip() + "\n\n")
 
     # 6. Verification Summary
     print("\n" + "=" * 65)

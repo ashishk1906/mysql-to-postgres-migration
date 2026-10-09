@@ -70,6 +70,26 @@ def check_sql_server():
         ord_rows = [[o["OrderID"], o["OrderNumber"], o["CustomerID"], f"${float(o['TotalAmount']):,.2f}", str(o["OrderDate"])[:19], o["PaymentStatus"]] for o in orders]
         print(tabulate(ord_rows, headers=["OrderID", "Order #", "Cust ID", "Total Amount", "Order Date", "Status"], tablefmt="github"))
 
+        # 4. Source Views Check
+        cur.execute("""
+            SELECT s.name AS [Schema], v.name AS [ViewName]
+            FROM sys.views v
+            JOIN sys.schemas s ON v.schema_id = s.schema_id
+            WHERE s.name IN ('core', 'inventory', 'sales', 'audit')
+            ORDER BY s.name, v.name;
+        """)
+        views = cur.fetchall()
+        view_rows = [[v["Schema"], v["ViewName"]] for v in views]
+        print(f"\n[+] Found {len(views)} Views in SQL Server:\n")
+        print(tabulate(view_rows, headers=["Schema", "View Name"], tablefmt="github"))
+
+        # Sample from view
+        cur.execute("SELECT TOP 3 CustomerID, ContactName, TotalOrdersPlaced, LifetimeOrderValue FROM sales.vw_CustomerOrderSummary;")
+        vw_data = cur.fetchall()
+        vw_rows = [[d["CustomerID"], d["ContactName"], d["TotalOrdersPlaced"], f"${float(d['LifetimeOrderValue']):,.2f}"] for d in vw_data]
+        print("\n[+] Sample output from 'sales.vw_CustomerOrderSummary':")
+        print(tabulate(vw_rows, headers=["CustomerID", "Contact", "Orders Placed", "Lifetime Value"], tablefmt="github"))
+
         conn.close()
     except Exception as e:
         print(f"[-] Could not connect to SQL Server: {e}")
@@ -105,6 +125,7 @@ def check_postgres():
             SELECT table_schema, table_name
             FROM information_schema.tables
             WHERE table_schema IN ('core', 'inventory', 'sales', 'audit')
+              AND table_type = 'BASE TABLE'
             ORDER BY table_schema, table_name;
         """)
         tables = cur.fetchall()
@@ -130,6 +151,28 @@ def check_postgres():
         customers = cur.fetchall()
         cust_rows = [[c[0], c[1] or "N/A", c[2], c[3], f"${float(c[4]):,.2f}"] for c in customers]
         print(tabulate(cust_rows, headers=["customer_id", "company_name", "contact_name", "email", "credit_limit"], tablefmt="github"))
+
+        # 3. Target Views Check
+        cur.execute("""
+            SELECT table_schema, table_name
+            FROM information_schema.views
+            WHERE table_schema IN ('core', 'inventory', 'sales', 'audit')
+            ORDER BY table_schema, table_name;
+        """)
+        pg_views = cur.fetchall()
+        if pg_views:
+            pg_v_rows = [[v[0], v[1]] for v in pg_views]
+            print(f"\n[+] Found {len(pg_views)} Migrated Views in PostgreSQL:\n")
+            print(tabulate(pg_v_rows, headers=["Schema", "View Name"], tablefmt="github"))
+
+            # Sample from migrated view
+            cur.execute("SELECT customer_id, contact_name, total_orders_placed, lifetime_order_value FROM sales.vw_customer_order_summary LIMIT 3;")
+            vw_data = cur.fetchall()
+            vw_rows = [[d[0], d[1], d[2], f"${float(d[3]):,.2f}"] for d in vw_data]
+            print("\n[+] Sample output from migrated 'sales.vw_customer_order_summary':")
+            print(tabulate(vw_rows, headers=["customer_id", "contact_name", "total_orders_placed", "lifetime_order_value"], tablefmt="github"))
+        else:
+            print("\n[-] 0 views currently migrated to PostgreSQL.")
 
         conn.close()
     except Exception as e:
