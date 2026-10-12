@@ -326,3 +326,114 @@ INSERT INTO audit.SystemConfigurations (ConfigKey, ConfigValue, DataType, Descri
 ('ENABLE_AUDIT_LOGGING', 'true', 'BOOLEAN', 'Flag to trigger row-level audit event stream', 0, '2026-01-01 00:00:00'),
 ('PAYMENT_GATEWAY_ENDPOINT', 'https://api.stripe.com/v1', 'STRING', 'Payment integration base URL', 0, '2026-01-01 00:00:00');
 GO
+
+-- ----------------------------------------------------------------------------
+-- 27. core.Currencies
+-- ----------------------------------------------------------------------------
+INSERT INTO core.Currencies (CurrencyCode, CurrencyName, Symbol, ExchangeRateToUSD, IsActive) VALUES
+('USD', 'United States Dollar', '$', 1.000000, 1),
+('EUR', 'Euro', '€', 1.085000, 1),
+('GBP', 'British Pound Sterling', '£', 1.272000, 1),
+('CAD', 'Canadian Dollar', 'CA$', 0.738000, 1),
+('JPY', 'Japanese Yen', '¥', 0.006650, 1),
+('AUD', 'Australian Dollar', 'A$', 0.655000, 1),
+('SGD', 'Singapore Dollar', 'S$', 0.742000, 1),
+('CHF', 'Swiss Franc', 'CHF', 1.112000, 1);
+GO
+
+-- ----------------------------------------------------------------------------
+-- 28. core.CustomerPaymentMethods
+-- ----------------------------------------------------------------------------
+INSERT INTO core.CustomerPaymentMethods (CustomerID, MethodType, Provider, MaskedIdentifier, ExpiryMonth, ExpiryYear, IsDefault) VALUES
+(1001, 'CREDIT_CARD', 'Visa Corporate', '**** **** **** 8821', 11, 2028, 1),
+(1001, 'BANK_ACCOUNT', 'JPMorgan Chase ACH', 'Routing **012 Acct **941', NULL, NULL, 0),
+(1002, 'CREDIT_CARD', 'Mastercard World Elite', '**** **** **** 4242', 8, 2027, 1),
+(1003, 'CREDIT_CARD', 'Barclays Visa', '**** **** **** 9102', 4, 2029, 1),
+(1004, 'DIGITAL_WALLET', 'PayPal Express', 'cmendoza@outlook.com', NULL, NULL, 1),
+(1005, 'BANK_ACCOUNT', 'Silicon Valley Wire', 'FedWire Mandate **882', NULL, NULL, 1),
+(1006, 'BANK_ACCOUNT', 'Bank of America Treasury', 'Municipal Wire **771', NULL, NULL, 1);
+GO
+
+-- ----------------------------------------------------------------------------
+-- 29. inventory.WarehouseBins
+-- ----------------------------------------------------------------------------
+INSERT INTO inventory.WarehouseBins (WarehouseID, BinCode, Aisle, Rack, Shelf, MaxWeightKg, IsActive) VALUES
+(1, 'BIN-A1-R1-S1', 'A1', 'R1', 'S1', 1200.00, 1),
+(1, 'BIN-A1-R1-S2', 'A1', 'R1', 'S2', 800.00, 1),
+(1, 'BIN-A2-R3-S1', 'A2', 'R3', 'S1', 1500.00, 1),
+(2, 'BIN-B1-R1-S1', 'B1', 'R1', 'S1', 1000.00, 1),
+(2, 'BIN-B2-R2-S3', 'B2', 'R2', 'S3', 600.00, 1),
+(3, 'BIN-E1-R1-S1', 'E1', 'R1', 'S1', 2000.00, 1),
+(3, 'BIN-E2-R4-S2', 'E2', 'R4', 'S2', 950.00, 1),
+(4, 'BIN-S1-R1-S1', 'S1', 'R1', 'S1', 750.00, 1);
+GO
+
+-- ----------------------------------------------------------------------------
+-- 30. inventory.PurchaseOrders
+-- ----------------------------------------------------------------------------
+INSERT INTO inventory.PurchaseOrders (PONumber, SupplierID, DestinationWarehouseID, OrderedByEmployeeID, Status, OrderDate, ExpectedDeliveryDate, ActualDeliveryDate, SubTotal, TaxAmount, ShippingFee, TotalCost) VALUES
+('PO-2026-00101', 1, 1, 504, 'RECEIVED', '2026-01-15 09:00:00', '2026-01-25 17:00:00', '2026-01-24 14:30:00', 4500.00, 360.00, 250.00, 5110.00),
+('PO-2026-00102', 2, 1, 504, 'RECEIVED', '2026-02-01 10:30:00', '2026-02-12 17:00:00', '2026-02-11 11:15:00', 13600.00, 1088.00, 450.00, 15138.00),
+('PO-2026-00103', 3, 2, 508, 'IN_TRANSIT', '2026-02-20 14:00:00', '2026-03-10 17:00:00', NULL, 7600.00, 608.00, 380.00, 8588.00),
+('PO-2026-00104', 4, 3, 508, 'CONFIRMED', '2026-02-28 16:45:00', '2026-03-15 17:00:00', NULL, 3100.00, 248.00, 190.00, 3538.00);
+GO
+
+-- ----------------------------------------------------------------------------
+-- 31. inventory.PurchaseOrderItems
+-- ----------------------------------------------------------------------------
+INSERT INTO inventory.PurchaseOrderItems (PurchaseOrderID, ProductID, QuantityOrdered, QuantityReceived, UnitCost, TotalLineCost) VALUES
+(70001, 10001, 10000, 10000, 0.4500, 4500.00),
+(70002, 10003, 100, 100, 68.0000, 6800.00),
+(70002, 10004, 50, 50, 115.0000, 5750.00),
+(70003, 10006, 200, 0, 38.0000, 7600.00),
+(70004, 10005, 500, 0, 6.2000, 3100.00);
+GO
+
+-- ----------------------------------------------------------------------------
+-- 32. sales.ShippingCarriers
+-- ----------------------------------------------------------------------------
+INSERT INTO sales.ShippingCarriers (CarrierCode, CarrierName, TrackingUrlTemplate, ContactPhone, IsActive) VALUES
+('FEDEX', 'Federal Express Corp', 'https://www.fedex.com/fedextrack/?trknbr={TRACKING}', '+1-800-463-3339', 1),
+('UPS', 'United Parcel Service', 'https://www.ups.com/track?tracknum={TRACKING}', '+1-800-742-5877', 1),
+('DHL_EXPRESS', 'DHL Express Global', 'https://www.dhl.com/en/express/tracking.html?AWB={TRACKING}', '+1-800-225-5345', 1),
+('RL_CARRIERS', 'R+L Carriers Freight', 'https://www.rlcarriers.com/freight/shipping/shipment-tracing?pro={TRACKING}', '+1-800-543-5589', 1),
+('AUS_POST', 'Australia Post Global', 'https://auspost.com.au/mypost/track/#/details/{TRACKING}', '+61-13-7678', 1);
+GO
+
+-- ----------------------------------------------------------------------------
+-- 33. sales.ReturnMerchandiseAuthorizations
+-- ----------------------------------------------------------------------------
+INSERT INTO sales.ReturnMerchandiseAuthorizations (RMANumber, OrderID, CustomerID, Status, ReasonCategory, CustomerComments, RefundAmount, RequestedAt, ResolvedAt) VALUES
+('RMA-2026-0001', 500001, 1001, 'REFUNDED', 'DEFECTIVE_COMPONENT', 'Batch bolt threads slightly out of spec on 10 units.', 12.50, '2026-03-01 10:15:00', '2026-03-02 14:00:00'),
+('RMA-2026-0002', 500002, 1002, 'APPROVED', 'INCORRECT_VOLTAGE', 'Ordered 110V variant instead of 24V.', 290.00, '2026-03-02 11:30:00', '2026-03-02 16:45:00'),
+('RMA-2026-0003', 500004, 1003, 'REQUESTED', 'CUSTOMER_RECONSIDERED', 'Unopened sensor package, no longer required.', 149.00, '2026-03-03 09:20:00', NULL);
+GO
+
+-- ----------------------------------------------------------------------------
+-- 34. sales.RMAItems
+-- ----------------------------------------------------------------------------
+INSERT INTO sales.RMAItems (RMAID, OrderItemID, QuantityReturned, ItemCondition, RestockDecision) VALUES
+(1, 1, 10, 'DEFECTIVE', 'SCRAP_AND_CREDIT'),
+(2, 4, 5, 'UNOPENED', 'RESTOCK_TO_INVENTORY'),
+(3, 8, 1, 'UNOPENED', 'PENDING');
+GO
+
+-- ----------------------------------------------------------------------------
+-- 35. audit.DataMigrationHistory
+-- ----------------------------------------------------------------------------
+INSERT INTO audit.DataMigrationHistory (BatchReference, SourceSystem, TargetSystem, Status, TotalTablesMigrated, TotalRowsMigrated, ExecutionDurationSeconds, InitiatedBy, StartedAt, CompletedAt) VALUES
+('MIG-BATCH-2026-001', 'SQLServer_2022_Enterprise', 'PostgreSQL_16_Canonical', 'SUCCESS', 26, 1420, 4.35, 'migration_runner', '2026-02-28 02:00:00', '2026-02-28 02:00:04'),
+('MIG-BATCH-2026-002', 'SQLServer_2022_Enterprise', 'PostgreSQL_16_Canonical', 'SUCCESS', 26, 1680, 5.12, 'migration_runner', '2026-03-01 02:00:00', '2026-03-01 02:00:05'),
+('MIG-BATCH-2026-003', 'SQLServer_2022_Enterprise', 'PostgreSQL_16_Canonical', 'SUCCESS', 36, 2840, 7.82, 'migration_runner', '2026-03-03 14:00:00', '2026-03-03 14:00:08');
+GO
+
+-- ----------------------------------------------------------------------------
+-- 36. audit.UserSessions
+-- ----------------------------------------------------------------------------
+INSERT INTO audit.UserSessions (UserID, UserType, IPAddress, UserAgent, IsActive, LoginTime, LastActivityTime, ExpiresAt) VALUES
+(1001, 'CUSTOMER', '198.51.100.24', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0', 1, '2026-03-03 08:30:00', '2026-03-03 11:45:00', '2026-03-03 20:30:00'),
+(1002, 'CUSTOMER', '203.0.113.88', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) Safari/605.1', 1, '2026-03-03 09:15:00', '2026-03-03 12:10:00', '2026-03-03 21:15:00'),
+(1005, 'CUSTOMER', '192.0.2.145', 'Mozilla/5.0 (X11; Linux x86_64) Firefox/123.0', 0, '2026-03-02 14:00:00', '2026-03-02 16:30:00', '2026-03-02 22:00:00'),
+(503, 'EMPLOYEE', '10.200.4.15', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/122.0', 1, '2026-03-03 07:45:00', '2026-03-03 12:50:00', '2026-03-03 19:45:00'),
+(505, 'EMPLOYEE', '10.200.4.28', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0', 1, '2026-03-03 08:00:00', '2026-03-03 12:35:00', '2026-03-03 20:00:00');
+GO

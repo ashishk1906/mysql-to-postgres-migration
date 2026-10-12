@@ -44,14 +44,17 @@ The system encapsulates **Enterprise E-Commerce and Supply Chain ERP** workflows
 ├───────────────────┼───────────────────┼───────────────────┼────────────┤
 │ • Country         │ • Supplier        │ • PriceList       │ • AuditLog │
 │ • Customer        │ • Category        │ • Promotion       │ • SysConfig│
-│ • CustomerAddress │ • Brand           │ • SalesOrder      │            │
-│ • CustomerProfile │ • Warehouse       │ • OrderItem       │            │
-│ • Department      │ • Product         │ • OrderDiscount   │            │
-│ • Employee        │ • ProductVariant  │ • Fulfillment     │            │
-│                   │ • InventoryStock  │ • Invoice         │            │
+│ • CustomerAddress │ • Brand           │ • SalesOrder      │ • MigHistory│
+│ • CustomerProfile │ • Warehouse       │ • OrderItem       │ • UserSess │
+│ • CustomerPayMeth │ • WarehouseBin    │ • OrderDiscount   │            │
+│ • Department      │ • Product         │ • Fulfillment     │            │
+│ • Employee        │ • ProductVariant  │ • ShippingCarrier │            │
+│ • Currency        │ • InventoryStock  │ • Invoice         │            │
 │                   │ • InventoryTx     │ • Payment         │            │
-│                   │                   │ • OrderNote       │            │
-│                   │                   │ • CustomerReview  │            │
+│                   │ • PurchaseOrder   │ • OrderNote       │            │
+│                   │ • PurchaseItem    │ • CustomerReview  │            │
+│                   │                   │ • RMA (Returns)   │            │
+│                   │                   │ • RMAItem         │            │
 └───────────────────┴───────────────────┴───────────────────┴────────────┘
 ```
 
@@ -60,18 +63,23 @@ The system encapsulates **Enterprise E-Commerce and Supply Chain ERP** workflows
 - **`Customer`**: Master entity representing commercial clients and individual consumers. Includes global UUID, tax identification, and risk limits.
 - **`CustomerAddress`**: Multi-address management (Billing, Shipping, Office) associated with customers.
 - **`CustomerProfile`**: 1:1 extension containing loyalty program tiers, points, preferences, and authentication telemetry.
+- **`CustomerPaymentMethod`**: Stored customer payment tokens (Credit Card, Bank Mandate, Digital Wallet).
 - **`Department`**: Enterprise organizational unit with operational cost tracking.
 - **`Employee`**: Corporate workforce master with hierarchical management tree (`ManagerEmployeeID` self-referential foreign key) and compensation terms.
+- **`Currency`**: Currency master with active FX exchange conversion ratios relative to base USD.
 
 ### Domain 2: Inventory & Logistics (`inventory`)
 - **`Supplier`**: Vendor master with performance ratings and credit terms.
 - **`Category`**: Multi-level product classification hierarchy (`ParentCategoryID` recursive tree).
 - **`ProductBrand`**: Commercial trademarks and brand profiles.
 - **`Warehouse`**: Physical fulfillment centers and bonded storage facilities.
+- **`WarehouseBin`**: Physical aisle, rack, and shelf bin locations inside warehouses.
 - **`Product`**: Master catalog item defining dimensions, weights, default pricing, and primary supply sources.
 - **`ProductVariant`**: Stock keeping units (SKUs) representing physical variations (size, color, material).
 - **`ProductInventory`**: Multi-location inventory balances with reorder and safety thresholds (Composite PK: `ProductID`, `WarehouseID`).
 - **`InventoryTransaction`**: Immutable double-entry ledger tracking physical stock receipts, shipments, transfers, and adjustments.
+- **`PurchaseOrder`**: Inbound procurement orders issued to commercial suppliers.
+- **`PurchaseOrderItem`**: Detailed line items and received quantity tallies for purchase orders.
 
 ### Domain 3: Commercial & Order Management (`sales`)
 - **`PriceList`**: Tiered price catalogs with temporal validity periods.
@@ -80,14 +88,19 @@ The system encapsulates **Enterprise E-Commerce and Supply Chain ERP** workflows
 - **`OrderItem`**: Detailed order line items with discrete quantities, unit prices, and line discounts.
 - **`OrderDiscount`**: Promotion allocation junction table linking marketing campaigns to orders.
 - **`OrderFulfillment`**: Logistics tracking recording carriers, tracking numbers, and delivery milestones.
+- **`ShippingCarrier`**: Logistics carriers (FedEx, UPS, DHL) with API tracking URL templates.
 - **`Invoice`**: Accounts receivable bill with net terms, tax breakdowns, and remaining balances.
 - **`Payment`**: Financial remittance settlement linking to invoices with external transaction references.
 - **`OrderNote`**: Operational collaboration log for customer support and fulfillment agents.
 - **`CustomerReview`**: Post-purchase product feedback with verification flags.
+- **`ReturnMerchandiseAuthorization`**: Return requests (RMA) tracking reverse logistics and refund status.
+- **`RMAItem`**: Item-level inspection conditions and restock decisions for returned merchandise.
 
 ### Domain 4: Governance & Auditing (`audit`)
 - **`AuditLog`**: System-wide CDC (Change Data Capture) log recording operational mutations.
 - **`SystemConfiguration`**: Dynamic key-value environment settings and runtime parameters.
+- **`DataMigrationHistory`**: Historical pipeline execution audits recording tables, row volume, and runtimes.
+- **`UserSession`**: Authentication and telemetry session logs tracking customer and employee activity.
 
 ---
 

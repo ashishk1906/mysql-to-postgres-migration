@@ -8,8 +8,8 @@ No local Python installation, ODBC drivers, or database installations are needed
 
 ## 1. Project Overview
 
-- **Source Database**: Complex SQL Server database (**26 tables** across `core`, `inventory`, `sales`, and `audit` schemas) with primary keys, foreign keys, identity columns, recursive self-referential trees, composite keys, check constraints, filtered indexes, and realistic seed data.
-- **Canonical Data Model (CDM)**: Decouples legacy source technical debt by enforcing enterprise naming conventions (`snake_case`), universal data types (`TIMESTAMPTZ`, `BOOLEAN`, `UUID`, `BIGINT IDENTITY`), and domain-driven design.
+- **Source Database**: Complex enterprise SQL Server database (**36 tables** across `core`, `inventory`, `sales`, and `audit` schemas) with primary keys, foreign keys, identity columns, recursive self-referential trees, composite keys, check constraints, filtered indexes, and rich seed data.
+- **Canonical Data Model (CDM)**: Decouples legacy source technical debt by enforcing enterprise naming conventions (`snake_case`), universal data types (`TIMESTAMPTZ`, `BOOLEAN`, `UUID`, `BIGINT IDENTITY`), foreign key constraints, and domain-driven design.
 - **Docker-First Automation**: Complete migration pipeline containerized into simple `docker compose` commands that run anywhere (Windows, macOS, Linux).
 
 ---
@@ -20,7 +20,7 @@ No local Python installation, ODBC drivers, or database installations are needed
 ```bash
 docker compose up -d
 ```
-* **What happens**: Starts SQL Server 2022 (port `1433`), PostgreSQL 16 (port `5434`), and automatically seeds the 26-table sample database.
+* **What happens**: Starts SQL Server 2022 (port `1433`), PostgreSQL 16 (port `5434`), and automatically seeds the 36-table enterprise sample database.
 
 ---
 
@@ -40,14 +40,17 @@ docker compose run --rm check
 docker compose run --rm migrate
 ```
 * **What happens**: Runs the migration script inside Docker:
-  1. Extracts schema metadata (tables, columns, types, primary keys) from SQL Server.
+  1. Extracts schema metadata (tables, columns, types, primary keys, foreign keys) from SQL Server.
   2. Applies the Canonical Data Model (converts names to `snake_case`, maps types to PostgreSQL equivalents).
   3. Creates target schemas (`core`, `inventory`, `sales`, `audit`) and tables in PostgreSQL.
   4. Migrates all data rows.
-  5. Synchronizes PostgreSQL identity sequence generators.
-  6. Validates source and target row counts, printing a **100% Match** reconciliation table.
-  7. Saves output files to your local `./output` folder:
-     - [`output/postgres_schema.sql`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/output/postgres_schema.sql) (Generated PostgreSQL DDL)
+  5. Synchronizes PostgreSQL identity sequence generators (`pg_get_serial_sequence`).
+  6. Applies all **Foreign Key constraints** in PostgreSQL.
+  7. Deploys Canonical Views (`sales.vw_customer_order_summary`, `inventory.vw_low_stock_products`).
+  8. Deploys **Canonical PL/pgSQL Trigger Functions & Triggers** (`fn_set_updated_at`, `fn_audit_orders_mutation`).
+  9. Validates source and target row counts, printing a **100% Match** reconciliation table.
+  10. Saves output files to your local `./output` folder:
+     - [`output/postgres_schema.sql`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/output/postgres_schema.sql) (Complete PostgreSQL DDL with tables, FKs, views, and triggers)
      - [`output/validation_report.md`](file:///c:/Users/aks89/Desktop/mysql-to-postgres/output/validation_report.md) (Reconciliation audit report)
 
 ---

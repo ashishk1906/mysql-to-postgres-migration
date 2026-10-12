@@ -87,3 +87,46 @@ BEGIN
     END CATCH
 END;
 GO
+
+-- ----------------------------------------------------------------------------
+-- Triggers: Business Event Automation
+-- ----------------------------------------------------------------------------
+
+-- Trigger 1: Automatic UpdatedAt maintenance on Customers
+CREATE OR ALTER TRIGGER core.trg_Customers_UpdatedAt
+ON core.Customers
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT UPDATE(UpdatedAt)
+    BEGIN
+        UPDATE c
+        SET UpdatedAt = SYSUTCDATETIME()
+        FROM core.Customers c
+        INNER JOIN INSERTED i ON c.CustomerID = i.CustomerID;
+    END
+END;
+GO
+
+-- Trigger 2: Order Status Mutation Audit Logging
+CREATE OR ALTER TRIGGER sales.trg_Orders_AuditLog
+ON sales.Orders
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO audit.AuditLogs (SchemaName, TableName, RecordKey, ActionType, ChangedBy, ChangedAt, OldValuesJson, NewValuesJson)
+    SELECT 
+        'sales',
+        'orders',
+        CAST(i.OrderID AS VARCHAR(50)),
+        'UPDATE',
+        SYSTEM_USER,
+        SYSUTCDATETIME(),
+        (SELECT d.OrderStatus, d.TotalAmount FOR JSON PATH, WITHOUT_ARRAY_WRAPPER),
+        (SELECT i.OrderStatus, i.TotalAmount FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
+    FROM INSERTED i
+    INNER JOIN DELETED d ON i.OrderID = d.OrderID;
+END;
+GO

@@ -495,11 +495,178 @@ CREATE TABLE audit.SystemConfigurations (
 );
 GO
 
+-- Table 27: core.Currencies
+CREATE TABLE core.Currencies (
+    CurrencyCode CHAR(3) NOT NULL,
+    CurrencyName NVARCHAR(50) NOT NULL,
+    Symbol NVARCHAR(10) NOT NULL,
+    ExchangeRateToUSD DECIMAL(14, 6) NOT NULL CONSTRAINT DF_Currencies_Rate DEFAULT 1.000000,
+    IsActive BIT NOT NULL CONSTRAINT DF_Currencies_Active DEFAULT 1,
+    UpdatedAt DATETIME2(7) NOT NULL CONSTRAINT DF_Currencies_UpdatedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_Currencies PRIMARY KEY CLUSTERED (CurrencyCode)
+);
+GO
+
+-- Table 28: core.CustomerPaymentMethods
+CREATE TABLE core.CustomerPaymentMethods (
+    PaymentMethodID INT IDENTITY(1, 1) NOT NULL,
+    CustomerID INT NOT NULL,
+    MethodType VARCHAR(30) NOT NULL,
+    Provider VARCHAR(50) NOT NULL,
+    MaskedIdentifier VARCHAR(30) NOT NULL,
+    ExpiryMonth TINYINT NULL,
+    ExpiryYear SMALLINT NULL,
+    IsDefault BIT NOT NULL CONSTRAINT DF_CustPay_IsDefault DEFAULT 0,
+    CreatedAt DATETIME2(7) NOT NULL CONSTRAINT DF_CustPay_CreatedAt DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_CustomerPaymentMethods PRIMARY KEY CLUSTERED (PaymentMethodID),
+    CONSTRAINT FK_CustomerPaymentMethods_Customer FOREIGN KEY (CustomerID) REFERENCES core.Customers(CustomerID) ON DELETE CASCADE,
+    CONSTRAINT CK_CustomerPaymentMethods_Type CHECK (MethodType IN ('CREDIT_CARD', 'BANK_ACCOUNT', 'DIGITAL_WALLET'))
+);
+GO
+
+-- Table 29: inventory.WarehouseBins
+CREATE TABLE inventory.WarehouseBins (
+    BinID INT IDENTITY(1, 1) NOT NULL,
+    WarehouseID INT NOT NULL,
+    BinCode VARCHAR(30) NOT NULL,
+    Aisle VARCHAR(10) NOT NULL,
+    Rack VARCHAR(10) NOT NULL,
+    Shelf VARCHAR(10) NOT NULL,
+    MaxWeightKg DECIMAL(10, 2) NOT NULL CONSTRAINT DF_Bins_MaxWeight DEFAULT 500.00,
+    IsActive BIT NOT NULL CONSTRAINT DF_Bins_Active DEFAULT 1,
+    CONSTRAINT PK_WarehouseBins PRIMARY KEY CLUSTERED (BinID),
+    CONSTRAINT UQ_WarehouseBins_Code UNIQUE (WarehouseID, BinCode),
+    CONSTRAINT FK_WarehouseBins_Warehouse FOREIGN KEY (WarehouseID) REFERENCES inventory.Warehouses(WarehouseID)
+);
+GO
+
+-- Table 30: inventory.PurchaseOrders
+CREATE TABLE inventory.PurchaseOrders (
+    PurchaseOrderID BIGINT IDENTITY(70001, 1) NOT NULL,
+    PONumber VARCHAR(50) NOT NULL,
+    SupplierID INT NOT NULL,
+    DestinationWarehouseID INT NOT NULL,
+    OrderedByEmployeeID INT NOT NULL,
+    Status VARCHAR(25) NOT NULL CONSTRAINT DF_PO_Status DEFAULT 'DRAFT',
+    OrderDate DATETIME2(7) NOT NULL CONSTRAINT DF_PO_OrderDate DEFAULT SYSUTCDATETIME(),
+    ExpectedDeliveryDate DATETIME2(7) NULL,
+    ActualDeliveryDate DATETIME2(7) NULL,
+    SubTotal DECIMAL(14, 2) NOT NULL CONSTRAINT DF_PO_SubTotal DEFAULT 0.00,
+    TaxAmount DECIMAL(14, 2) NOT NULL CONSTRAINT DF_PO_Tax DEFAULT 0.00,
+    ShippingFee DECIMAL(10, 2) NOT NULL CONSTRAINT DF_PO_Shipping DEFAULT 0.00,
+    TotalCost DECIMAL(14, 2) NOT NULL CONSTRAINT DF_PO_TotalCost DEFAULT 0.00,
+    CONSTRAINT PK_PurchaseOrders PRIMARY KEY CLUSTERED (PurchaseOrderID),
+    CONSTRAINT UQ_PurchaseOrders_PONumber UNIQUE (PONumber),
+    CONSTRAINT FK_PurchaseOrders_Supplier FOREIGN KEY (SupplierID) REFERENCES inventory.Suppliers(SupplierID),
+    CONSTRAINT FK_PurchaseOrders_Warehouse FOREIGN KEY (DestinationWarehouseID) REFERENCES inventory.Warehouses(WarehouseID),
+    CONSTRAINT FK_PurchaseOrders_Employee FOREIGN KEY (OrderedByEmployeeID) REFERENCES core.Employees(EmployeeID),
+    CONSTRAINT CK_PurchaseOrders_Status CHECK (Status IN ('DRAFT', 'SUBMITTED', 'CONFIRMED', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED'))
+);
+GO
+
+-- Table 31: inventory.PurchaseOrderItems
+CREATE TABLE inventory.PurchaseOrderItems (
+    POItemID BIGINT IDENTITY(1, 1) NOT NULL,
+    PurchaseOrderID BIGINT NOT NULL,
+    ProductID INT NOT NULL,
+    QuantityOrdered INT NOT NULL,
+    QuantityReceived INT NOT NULL CONSTRAINT DF_POItems_Received DEFAULT 0,
+    UnitCost DECIMAL(12, 4) NOT NULL,
+    TotalLineCost DECIMAL(14, 2) NOT NULL,
+    CONSTRAINT PK_PurchaseOrderItems PRIMARY KEY CLUSTERED (POItemID),
+    CONSTRAINT FK_PurchaseOrderItems_PO FOREIGN KEY (PurchaseOrderID) REFERENCES inventory.PurchaseOrders(PurchaseOrderID) ON DELETE CASCADE,
+    CONSTRAINT FK_PurchaseOrderItems_Product FOREIGN KEY (ProductID) REFERENCES inventory.Products(ProductID),
+    CONSTRAINT CK_PurchaseOrderItems_Qty CHECK (QuantityOrdered > 0 AND QuantityReceived >= 0)
+);
+GO
+
+-- Table 32: sales.ShippingCarriers
+CREATE TABLE sales.ShippingCarriers (
+    CarrierID INT IDENTITY(1, 1) NOT NULL,
+    CarrierCode VARCHAR(30) NOT NULL,
+    CarrierName NVARCHAR(100) NOT NULL,
+    TrackingUrlTemplate NVARCHAR(255) NULL,
+    ContactPhone VARCHAR(30) NULL,
+    IsActive BIT NOT NULL CONSTRAINT DF_Carriers_Active DEFAULT 1,
+    CONSTRAINT PK_ShippingCarriers PRIMARY KEY CLUSTERED (CarrierID),
+    CONSTRAINT UQ_ShippingCarriers_Code UNIQUE (CarrierCode)
+);
+GO
+
+-- Table 33: sales.ReturnMerchandiseAuthorizations
+CREATE TABLE sales.ReturnMerchandiseAuthorizations (
+    RMAID BIGINT IDENTITY(1, 1) NOT NULL,
+    RMANumber VARCHAR(50) NOT NULL,
+    OrderID BIGINT NOT NULL,
+    CustomerID INT NOT NULL,
+    Status VARCHAR(25) NOT NULL CONSTRAINT DF_RMA_Status DEFAULT 'REQUESTED',
+    ReasonCategory VARCHAR(50) NOT NULL,
+    CustomerComments NVARCHAR(500) NULL,
+    RefundAmount DECIMAL(12, 2) NOT NULL CONSTRAINT DF_RMA_Refund DEFAULT 0.00,
+    RequestedAt DATETIME2(7) NOT NULL CONSTRAINT DF_RMA_RequestedAt DEFAULT SYSUTCDATETIME(),
+    ResolvedAt DATETIME2(7) NULL,
+    CONSTRAINT PK_ReturnMerchandiseAuthorizations PRIMARY KEY CLUSTERED (RMAID),
+    CONSTRAINT UQ_RMA_Number UNIQUE (RMANumber),
+    CONSTRAINT FK_RMA_Order FOREIGN KEY (OrderID) REFERENCES sales.Orders(OrderID),
+    CONSTRAINT FK_RMA_Customer FOREIGN KEY (CustomerID) REFERENCES core.Customers(CustomerID),
+    CONSTRAINT CK_RMA_Status CHECK (Status IN ('REQUESTED', 'APPROVED', 'REJECTED', 'RECEIVED', 'REFUNDED', 'CLOSED'))
+);
+GO
+
+-- Table 34: sales.RMAItems
+CREATE TABLE sales.RMAItems (
+    RMAItemID BIGINT IDENTITY(1, 1) NOT NULL,
+    RMAID BIGINT NOT NULL,
+    OrderItemID BIGINT NOT NULL,
+    QuantityReturned INT NOT NULL,
+    ItemCondition VARCHAR(30) NOT NULL CONSTRAINT DF_RMAItems_Condition DEFAULT 'UNOPENED',
+    RestockDecision VARCHAR(30) NOT NULL CONSTRAINT DF_RMAItems_Decision DEFAULT 'PENDING',
+    CONSTRAINT PK_RMAItems PRIMARY KEY CLUSTERED (RMAItemID),
+    CONSTRAINT FK_RMAItems_RMA FOREIGN KEY (RMAID) REFERENCES sales.ReturnMerchandiseAuthorizations(RMAID) ON DELETE CASCADE,
+    CONSTRAINT FK_RMAItems_OrderItem FOREIGN KEY (OrderItemID) REFERENCES sales.OrderItems(OrderItemID),
+    CONSTRAINT CK_RMAItems_Condition CHECK (ItemCondition IN ('UNOPENED', 'DAMAGED_IN_SHIPPING', 'DEFECTIVE', 'INCORRECT_ITEM', 'USED'))
+);
+GO
+
+-- Table 35: audit.DataMigrationHistory
+CREATE TABLE audit.DataMigrationHistory (
+    MigrationID BIGINT IDENTITY(1, 1) NOT NULL,
+    BatchReference VARCHAR(50) NOT NULL,
+    SourceSystem VARCHAR(50) NOT NULL,
+    TargetSystem VARCHAR(50) NOT NULL,
+    Status VARCHAR(20) NOT NULL,
+    TotalTablesMigrated INT NOT NULL,
+    TotalRowsMigrated BIGINT NOT NULL,
+    ExecutionDurationSeconds DECIMAL(8, 2) NOT NULL,
+    InitiatedBy VARCHAR(100) NOT NULL CONSTRAINT DF_MigHistory_User DEFAULT SYSTEM_USER,
+    StartedAt DATETIME2(7) NOT NULL CONSTRAINT DF_MigHistory_Start DEFAULT SYSUTCDATETIME(),
+    CompletedAt DATETIME2(7) NULL,
+    CONSTRAINT PK_DataMigrationHistory PRIMARY KEY CLUSTERED (MigrationID)
+);
+GO
+
+-- Table 36: audit.UserSessions
+CREATE TABLE audit.UserSessions (
+    SessionID UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_Sessions_ID DEFAULT NEWID(),
+    UserID INT NOT NULL,
+    UserType VARCHAR(20) NOT NULL,
+    IPAddress VARCHAR(45) NOT NULL,
+    UserAgent NVARCHAR(255) NULL,
+    IsActive BIT NOT NULL CONSTRAINT DF_Sessions_Active DEFAULT 1,
+    LoginTime DATETIME2(7) NOT NULL CONSTRAINT DF_Sessions_Login DEFAULT SYSUTCDATETIME(),
+    LastActivityTime DATETIME2(7) NOT NULL CONSTRAINT DF_Sessions_Activity DEFAULT SYSUTCDATETIME(),
+    ExpiresAt DATETIME2(7) NOT NULL,
+    CONSTRAINT PK_UserSessions PRIMARY KEY CLUSTERED (SessionID),
+    CONSTRAINT CK_UserSessions_Type CHECK (UserType IN ('CUSTOMER', 'EMPLOYEE'))
+);
+GO
+
 -- ----------------------------------------------------------------------------
 -- INDEXES (Clustered, Non-Clustered, Composite, Filtered)
 -- ----------------------------------------------------------------------------
 
 CREATE NONCLUSTERED INDEX IX_CustomerAddresses_CustomerID ON core.CustomerAddresses (CustomerID);
+CREATE NONCLUSTERED INDEX IX_CustomerPaymentMethods_CustomerID ON core.CustomerPaymentMethods (CustomerID);
 CREATE NONCLUSTERED INDEX IX_Employees_DepartmentID ON core.Employees (DepartmentID);
 CREATE NONCLUSTERED INDEX IX_Employees_ManagerID ON core.Employees (ManagerEmployeeID);
 
@@ -508,16 +675,22 @@ CREATE NONCLUSTERED INDEX IX_Products_Supplier ON inventory.Products (PrimarySup
 CREATE NONCLUSTERED INDEX IX_ProductVariants_ProductID ON inventory.ProductVariants (ProductID);
 CREATE NONCLUSTERED INDEX IX_ProductInventory_WarehouseID ON inventory.ProductInventory (WarehouseID);
 CREATE NONCLUSTERED INDEX IX_InventoryTransactions_Product_Warehouse ON inventory.InventoryTransactions (ProductID, WarehouseID);
+CREATE NONCLUSTERED INDEX IX_WarehouseBins_WarehouseID ON inventory.WarehouseBins (WarehouseID);
+CREATE NONCLUSTERED INDEX IX_PurchaseOrders_SupplierID ON inventory.PurchaseOrders (SupplierID);
+CREATE NONCLUSTERED INDEX IX_PurchaseOrderItems_POID ON inventory.PurchaseOrderItems (PurchaseOrderID);
 
 CREATE NONCLUSTERED INDEX IX_Orders_CustomerID ON sales.Orders (CustomerID);
 CREATE NONCLUSTERED INDEX IX_Orders_OrderDate ON sales.Orders (OrderDate);
--- Filtered Index: active/pending orders only
 CREATE NONCLUSTERED INDEX IX_Orders_ActiveOrders ON sales.Orders (CustomerID, OrderStatus) WHERE OrderStatus IN (1, 2, 3);
-
 CREATE NONCLUSTERED INDEX IX_OrderItems_OrderID ON sales.OrderItems (OrderID);
 CREATE NONCLUSTERED INDEX IX_OrderItems_ProductID ON sales.OrderItems (ProductID);
 CREATE NONCLUSTERED INDEX IX_Invoices_Status ON sales.Invoices (Status);
 CREATE NONCLUSTERED INDEX IX_Payments_InvoiceID ON sales.Payments (InvoiceID);
 CREATE NONCLUSTERED INDEX IX_CustomerReviews_Product_Rating ON sales.CustomerReviews (ProductID, Rating);
+CREATE NONCLUSTERED INDEX IX_RMA_OrderID ON sales.ReturnMerchandiseAuthorizations (OrderID);
+CREATE NONCLUSTERED INDEX IX_RMA_CustomerID ON sales.ReturnMerchandiseAuthorizations (CustomerID);
+CREATE NONCLUSTERED INDEX IX_RMAItems_RMAID ON sales.RMAItems (RMAID);
+
 CREATE NONCLUSTERED INDEX IX_AuditLogs_Table_Date ON audit.AuditLogs (SchemaName, TableName, ChangedAt);
+CREATE NONCLUSTERED INDEX IX_UserSessions_UserID ON audit.UserSessions (UserID);
 GO

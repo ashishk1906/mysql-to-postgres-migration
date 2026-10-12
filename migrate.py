@@ -92,7 +92,11 @@ TYPE_MAP = {
     "time": "TIME",
     "datetime": "TIMESTAMPTZ",
     "datetime2": "TIMESTAMPTZ",
-    "uniqueidentifier": "UUID"
+    "datetimeoffset": "TIMESTAMPTZ",
+    "uniqueidentifier": "UUID",
+    "varbinary": "BYTEA",
+    "binary": "BYTEA",
+    "image": "BYTEA"
 }
 
 def to_snake(name: str) -> str:
@@ -160,6 +164,29 @@ def run_migration():
     for p in pks:
         key = f"{p['schema']}.{p['table']}"
         pk_map.setdefault(key, []).append(to_snake(p['pk_col']))
+
+    # Read Foreign Keys
+    ms_cur.execute(f"""
+        SELECT 
+            fk.name AS fk_name,
+            sp.name AS parent_schema,
+            tp.name AS parent_table,
+            cp.name AS parent_col,
+            sr.name AS ref_schema,
+            tr.name AS ref_table,
+            cr.name AS ref_col
+        FROM sys.foreign_keys fk
+        JOIN sys.tables tp ON fk.parent_object_id = tp.object_id
+        JOIN sys.schemas sp ON tp.schema_id = sp.schema_id
+        JOIN sys.tables tr ON fk.referenced_object_id = tr.object_id
+        JOIN sys.schemas sr ON tr.schema_id = sr.schema_id
+        JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+        JOIN sys.columns cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
+        JOIN sys.columns cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id
+        WHERE sp.name IN ('{schema_filter}') AND sr.name IN ('{schema_filter}')
+        ORDER BY fk.name, fkc.constraint_column_id;
+    """)
+    foreign_keys = ms_cur.fetchall()
 
     table_cols = {}
     for c in all_cols:
@@ -278,8 +305,27 @@ def run_migration():
                 """
                 pg_cur.execute(sync_sql)
 
-    # Step 5: Deploy Canonical Views in PostgreSQL
-    print("\n[Step 5] Deploying Canonical Views in PostgreSQL...")
+    # Step 5: Apply Foreign Key Constraints in PostgreSQL
+    print("\n[Step 5] Applying Foreign Key constraints in PostgreSQL...")
+    fk_statements = []
+    for fk in foreign_keys:
+        p_schema = to_snake(fk['parent_schema'])
+        p_table = to_snake(fk['parent_table'])
+        p_col = to_snake(fk['parent_col'])
+        r_schema = to_snake(fk['ref_schema'])
+        r_table = to_snake(fk['ref_table'])
+        r_col = to_snake(fk['ref_col'])
+        fk_name = to_snake(fk['fk_name'])
+        fk_sql = f'ALTER TABLE "{p_schema}"."{p_table}" ADD CONSTRAINT "{fk_name}" FOREIGN KEY ("{p_col}") REFERENCES "{r_schema}"."{r_table}" ("{r_col}");'
+        fk_statements.append(fk_sql)
+        try:
+            pg_cur.execute(fk_sql)
+        except Exception as e:
+            print(f" -> Notice: FK {fk_name} skipped ({e})")
+    print(f" -> Applied {len(fk_statements)} foreign key constraints.")
+
+    # Step 6: Deploy Canonical Views in PostgreSQL
+    print("\n[Step 6] Deploying Canonical Views in PostgreSQL...")
     canonical_views = [
         ("""
         CREATE OR REPLACE VIEW sales.vw_customer_order_summary AS
@@ -327,6 +373,73 @@ def run_migration():
         pg_cur.execute(v_sql)
         print(f" -> Created view {v_name}")
 
+    # Step 7: Deploy Canonical Trigger Functions & Triggers in PostgreSQL
+    print("\n[Step 7] Deploying Canonical Trigger Functions & Triggers in PostgreSQL...")
+    canonical_triggers = [
+        ("""
+        CREATE OR REPLACE FUNCTION core.fn_set_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """, "core.fn_set_updated_at"),
+        ("""
+        DROP TRIGGER IF EXISTS trg_customers_updated_at ON core.customers;
+        CREATE TRIGGER trg_customers_updated_at
+        BEFORE UPDATE ON core.customers
+        FOR EACH ROW
+        EXECUTE FUNCTION core.fn_set_updated_at();
+        """, "core.trg_customers_updated_at"),
+        ("""
+        CREATE OR REPLACE FUNCTION inventory.fn_set_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = CURRENT_TIMESTAMP;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """, "inventory.fn_set_updated_at"),
+        ("""
+        DROP TRIGGER IF EXISTS trg_products_updated_at ON inventory.products;
+        CREATE TRIGGER trg_products_updated_at
+        BEFORE UPDATE ON inventory.products
+        FOR EACH ROW
+        EXECUTE FUNCTION inventory.fn_set_updated_at();
+        """, "inventory.trg_products_updated_at"),
+        ("""
+        CREATE OR REPLACE FUNCTION sales.fn_audit_orders_mutation()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            INSERT INTO audit.audit_logs (
+                schema_name, table_name, record_key, action_type, changed_by, changed_at, old_values_json, new_values_json
+            ) VALUES (
+                'sales',
+                'orders',
+                COALESCE(NEW.order_id, OLD.order_id)::text,
+                TG_OP,
+                CURRENT_USER,
+                CURRENT_TIMESTAMP,
+                json_build_object('order_status', OLD.order_status, 'total_amount', OLD.total_amount, 'payment_status', OLD.payment_status)::text,
+                CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE json_build_object('order_status', NEW.order_status, 'total_amount', NEW.total_amount, 'payment_status', NEW.payment_status)::text END
+            );
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        """, "sales.fn_audit_orders_mutation"),
+        ("""
+        DROP TRIGGER IF EXISTS trg_orders_audit_mutation ON sales.orders;
+        CREATE TRIGGER trg_orders_audit_mutation
+        AFTER UPDATE OR DELETE ON sales.orders
+        FOR EACH ROW
+        EXECUTE FUNCTION sales.fn_audit_orders_mutation();
+        """, "sales.trg_orders_audit_mutation")
+    ]
+    for t_sql, t_name in canonical_triggers:
+        pg_cur.execute(t_sql)
+        print(f" -> Deployed {t_name}")
+
     # Save generated DDL to output/postgres_schema.sql
     import os
     os.makedirs("output", exist_ok=True)
@@ -365,9 +478,18 @@ def run_migration():
                 col_defs.append(f'    CONSTRAINT "pk_{tgt_table}" PRIMARY KEY ({pk_cols_str})')
             f.write(f'CREATE TABLE IF NOT EXISTS "{tgt_schema}"."{tgt_table}" (\n' + ',\n'.join(col_defs) + '\n);\n\n')
 
+        f.write("-- Foreign Key Constraints\n")
+        for fk_stmt in fk_statements:
+            f.write(fk_stmt + "\n")
+        f.write("\n")
+
         f.write("-- Canonical Views\n")
         for v_sql, _ in canonical_views:
             f.write(v_sql.strip() + "\n\n")
+
+        f.write("-- Canonical Trigger Functions & Triggers\n")
+        for t_sql, _ in canonical_triggers:
+            f.write(t_sql.strip() + "\n\n")
 
     # 6. Verification Summary
     print("\n" + "=" * 65)
